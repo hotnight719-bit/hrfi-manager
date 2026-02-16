@@ -50,4 +50,5 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
         }),
     ],
     debug: true, // Enable debugging to see logs in Netlify
+    trustHost: true, // Trust the host header on Netlify
 });
