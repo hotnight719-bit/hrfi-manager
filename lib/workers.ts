@@ -37,12 +37,12 @@ export async function addWorker(worker: Omit<Worker, 'id'>): Promise<Worker> {
 
 export async function updateWorker(id: string, updates: Partial<Worker>): Promise<Worker | null> {
     try {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { team, createdAt, updatedAt, ...cleanUpdates } = updates;
+
         const updated = await prisma.worker.update({
             where: { id },
-            data: {
-                ...updates,
-                // Exclude ID from updates just in case, though Partial handles it
-            }
+            data: cleanUpdates
         });
         return updated as Worker;
     } catch (e) {
