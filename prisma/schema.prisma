@@ -1,0 +1,127 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clients  Client[]
+  workers  Worker[]
+  workLogs WorkLog[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String   // Hashed password
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Client {
+  id             String  @id @default(cuid())
+  name           String
+  address        String?
+  manager        String?
+  contact_info   String?
+  rates          String  // JSON string of Rate[]
+  commission_type String? // 'Percent' | 'PerPerson'
+  commission_rate Float?
+  fee_per_person  Int?
+  
+  businessRegistrationImages String? // JSON string of string[] (URLs)
+  businessOwnerNames          String? // JSON string of string[]
+  businessRegistrationNumbers String? // JSON string of string[]
+  taxInvoiceEmail           String?
+  payType                   String?   @default("INDIVIDUAL") // 'INDIVIDUAL' or 'TOTAL'
+  isTaxFree                 Boolean   @default(false) // New: VAT Exclusion (Cash)
+
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workLogs WorkLog[]
+}
+
+model Worker {
+  id                String  @id @default(cuid())
+  name              String
+  phone             String
+  resident_id_front String?
+  address           String?
+  bank_name         String?
+  bank_account      String?
+  residentRegistrationNumber String? // New: Resident Registration Number
+  bankBookImage     String? // New: URL to bank book image
+  skill_level       String // 'Novice' | 'Intermediate' | 'Expert' | 'Specialist'
+  contract_type     String? // 'Regular' | 'Daily'
+  notes             String?
+  status            String // 'Active' | 'Inactive'
+
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workLogParticipations WorkLogParticipation[]
+}
+
+model WorkLog {
+  id          String   @id @default(cuid())
+  date        String   // YYYY-MM-DD
+  start_time  String?
+  
+  volume_type String
+  quantity    Float    @default(0)
+  status      String?  // 'Normal' | 'Waiting' | 'Cancelled'
+  waiting_rate Float?
+
+  // Manual overrides for waiting/cancelled
+  manualWaitingBillable   Int?
+  manualWaitingWorkerPay  Int?
+
+  unit_price              Int
+  total_payment_to_workers Int
+  billable_amount         Int
+  is_billed               Boolean @default(false)
+  is_paid_to_workers      Boolean @default(false)
+  
+  isTaxFree               Boolean @default(false) // New: Work-specific VAT exclusion
+  isPaidFromClient        Boolean @default(false) // New: Payment Received Check
+  
+  notes                   String?
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id])
+
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participations WorkLogParticipation[]
+}
+
+model WorkLogParticipation {
+  id        String @id @default(cuid())
+  workLogId String
+  workerId  String
+
+  workLog WorkLog @relation(fields: [workLogId], references: [id], onDelete: Cascade)
+  worker  Worker  @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@unique([workLogId, workerId])
+}
