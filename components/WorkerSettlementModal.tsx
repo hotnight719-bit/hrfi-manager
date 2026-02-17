@@ -29,7 +29,10 @@ export default function WorkerSettlementModal({ worker, clients, logs, initialDa
     }).sort((a, b) => a.date.localeCompare(b.date));
 
     // Calculate total
-    const totalAmount = relevantLogs.reduce((sum, log) => sum + log.unit_price, 0);
+    const subTotal = relevantLogs.reduce((sum, log) => sum + log.unit_price, 0);
+    const hasBusinessRegistration = !!worker.businessRegistrationNumber && worker.businessRegistrationNumber.trim() !== '';
+    const vatAmount = hasBusinessRegistration ? Math.floor(subTotal * 0.1) : 0;
+    const totalAmount = subTotal + vatAmount;
 
     const getClientName = (clientId: string) => {
         return clients.find(c => c.id === clientId)?.name || '알 수 없음';
@@ -221,8 +224,22 @@ export default function WorkerSettlementModal({ worker, clients, logs, initialDa
                             </tbody>
                             <tfoot>
                                 <tr style={{ backgroundColor: '#f9fafb', fontWeight: 'bold' }}>
-                                    <td colSpan={2} style={{ border: '1px solid #d1d5db', padding: '15px', textAlign: 'center' }}>합 계</td>
-                                    <td style={{ border: '1px solid #d1d5db', padding: '15px', textAlign: 'right', fontSize: '18px', color: '#1e40af' }}>
+                                    <td colSpan={2} style={{ border: '1px solid #d1d5db', padding: '10px', textAlign: 'center' }}>소 계</td>
+                                    <td style={{ border: '1px solid #d1d5db', padding: '10px', textAlign: 'right', fontSize: '16px' }}>
+                                        {subTotal.toLocaleString()}
+                                    </td>
+                                </tr>
+                                {hasBusinessRegistration && (
+                                    <tr style={{ backgroundColor: '#f9fafb', fontWeight: 'bold' }}>
+                                        <td colSpan={2} style={{ border: '1px solid #d1d5db', padding: '10px', textAlign: 'center', color: '#6b7280' }}>부가세 (10%)</td>
+                                        <td style={{ border: '1px solid #d1d5db', padding: '10px', textAlign: 'right', fontSize: '16px', color: '#6b7280' }}>
+                                            {vatAmount.toLocaleString()}
+                                        </td>
+                                    </tr>
+                                )}
+                                <tr style={{ backgroundColor: '#f0f9ff', fontWeight: 'bold' }}>
+                                    <td colSpan={2} style={{ border: '1px solid #d1d5db', padding: '15px', textAlign: 'center', fontSize: '16px' }}>총 지급액</td>
+                                    <td style={{ border: '1px solid #d1d5db', padding: '15px', textAlign: 'right', fontSize: '20px', color: '#1e40af' }}>
                                         {totalAmount.toLocaleString()}
                                     </td>
                                 </tr>

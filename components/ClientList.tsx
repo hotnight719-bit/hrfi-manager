@@ -202,7 +202,7 @@ export default function ClientList({ initialClients }: ClientListProps) {
                             <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 border border-gray-300 whitespace-nowrap">업체명</th>
                             <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 border border-gray-300 whitespace-nowrap">주소</th>
                             <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 border border-gray-300 whitespace-nowrap">관리자</th>
-                            <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 border border-gray-300 whitespace-nowrap">단가 기준</th>
+
                             <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 border border-gray-300 whitespace-nowrap">용량(피트)</th>
                             <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 border border-gray-300 whitespace-nowrap">작업인원</th>
                             <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 border border-gray-300 whitespace-nowrap">작업비</th>
@@ -237,11 +237,7 @@ export default function ClientList({ initialClients }: ClientListProps) {
                                                         <td className="px-4 py-4 border border-gray-300 align-middle text-center text-sm text-gray-900 whitespace-nowrap" rowSpan={rowCount}>
                                                             {client.manager}
                                                         </td>
-                                                        <td className="px-4 py-4 border border-gray-300 align-middle text-center text-sm text-gray-900 whitespace-nowrap" rowSpan={rowCount}>
-                                                            <span className={`px-2 py-1 rounded text-xs font-semibold ${client.payType === 'TOTAL' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
-                                                                {client.payType === 'TOTAL' ? '전체 단가' : '인당 단가'}
-                                                            </span>
-                                                        </td>
+
                                                     </>
                                                 )}
 
@@ -372,22 +368,56 @@ export default function ClientList({ initialClients }: ClientListProps) {
                                     <label className="block text-sm font-medium text-gray-700">주소</label>
                                     <input name="address" type="text" defaultValue={editingClient?.address || ''} required className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
                                 </div>
+
+                                <div className="col-span-2 bg-blue-50 p-4 rounded-md border border-blue-100 mb-2">
+                                    <label className="block text-sm font-bold text-blue-900 mb-2">수수료/단가 적용 방식</label>
+                                    <div className="flex space-x-6">
+                                        <label className="flex items-center space-x-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="payType"
+                                                value="INDIVIDUAL"
+                                                checked={(editingClient?.payType || 'INDIVIDUAL') === 'INDIVIDUAL'}
+                                                onChange={() => setEditingClient(prev => prev ? ({ ...prev, payType: 'INDIVIDUAL' }) : null)}
+                                                className="form-radio h-4 w-4 text-blue-600"
+                                            />
+                                            <span className="text-sm text-gray-800">인당 적용 (기본)</span>
+                                            <span className="text-xs text-gray-500 ml-1">- 단가와 수수료를 작업 인원만큼 곱합니다.</span>
+                                        </label>
+                                        <label className="flex items-center space-x-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="payType"
+                                                value="TOTAL"
+                                                checked={editingClient?.payType === 'TOTAL'}
+                                                onChange={() => setEditingClient(prev => prev ? ({ ...prev, payType: 'TOTAL' }) : null)}
+                                                className="form-radio h-4 w-4 text-blue-600"
+                                            />
+                                            <span className="text-sm text-gray-800">건당(전체) 적용</span>
+                                            <span className="text-xs text-gray-500 ml-1">- 전체 금액에서 수수료를 한 번만 뻅니다.</span>
+                                        </label>
+                                    </div>
+                                </div>
+
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">작업비 (인당, 원)</label>
-                                    <input name="fee_per_person" type="number" defaultValue={editingClient?.fee_per_person || 5000} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                    <label className="block text-sm font-medium text-gray-700">
+                                        수수료 ({editingClient?.payType === 'TOTAL' ? '전체' : '인당'})
+                                    </label>
+                                    <input
+                                        name="fee_per_person"
+                                        type="number"
+                                        value={editingClient?.fee_per_person || ''}
+                                        onChange={(e) => setEditingClient(prev => prev ? ({ ...prev, fee_per_person: parseInt(e.target.value) || 0 }) : null)}
+                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                        placeholder="수수료 (원)"
+                                    />
                                 </div>
                                 {/* New Fields */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">세금계산서 이메일</label>
                                     <input name="taxInvoiceEmail" type="email" defaultValue={editingClient?.taxInvoiceEmail || ''} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="example@email.com" />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">단가 기준</label>
-                                    <select name="payType" defaultValue={editingClient?.payType || 'INDIVIDUAL'} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
-                                        <option value="INDIVIDUAL">인당 단가 (기본)</option>
-                                        <option value="TOTAL">전체 단가 (통단가)</option>
-                                    </select>
-                                </div>
+
                             </div>
 
                             {/* Representative Names */}
@@ -490,22 +520,36 @@ export default function ClientList({ initialClients }: ClientListProps) {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block text-xs text-gray-500">인원</label>
+                                            <label className="block text-xs text-gray-500">작업인원수</label>
                                             <input
                                                 type="number"
-                                                value={rate.headcount}
-                                                onChange={(e) => handleRateChange(index, 'headcount', parseInt(e.target.value))}
+                                                value={rate.headcount || ''}
+                                                onChange={(e) => handleRateChange(index, 'headcount', parseInt(e.target.value) || 0)}
                                                 className="w-16 p-1 border rounded"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs text-gray-500">단가(만원)</label>
+                                            <label className="block text-xs text-gray-500">
+                                                {editingClient?.payType === 'TOTAL' ? '단가(전체)' : '단가(인당)'}
+                                            </label>
                                             <input
                                                 type="number"
-                                                value={rate.rate_per_person}
-                                                onChange={(e) => handleRateChange(index, 'rate_per_person', parseInt(e.target.value))}
+                                                value={rate.rate_per_person || ''}
+                                                onChange={(e) => handleRateChange(index, 'rate_per_person', parseInt(e.target.value) || 0)}
                                                 className="w-24 p-1 border rounded"
                                             />
+                                        </div>
+                                        <div className="flex items-center text-xs text-gray-500 ml-2 mt-6">
+                                            {editingClient?.payType === 'TOTAL' ? (
+                                                <span>= 청구: {(rate.rate_per_person || 0).toLocaleString()}원</span>
+                                            ) : (
+                                                <span>
+                                                    = 청구(총액): {(((rate.rate_per_person || 0) + (editingClient?.fee_per_person || 0)) * (rate.headcount || 1)).toLocaleString()}원
+                                                    <span className="text-gray-400 ml-1">
+                                                        ({((rate.rate_per_person || 0) + (editingClient?.fee_per_person || 0)).toLocaleString()}원 × {rate.headcount}명)
+                                                    </span>
+                                                </span>
+                                            )}
                                         </div>
                                         <button
                                             type="button"

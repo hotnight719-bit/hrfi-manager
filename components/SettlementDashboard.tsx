@@ -141,7 +141,13 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
     const workerStats = useMemo(() => {
         return initialWorkers.map(worker => {
             const activeLogs = filteredLogs.filter(l => l.worker_ids.includes(worker.id));
-            const earned = activeLogs.reduce((sum, l) => sum + l.unit_price, 0);
+            const subTotal = activeLogs.reduce((sum, l) => sum + l.unit_price, 0);
+
+            // Apply VAT if business
+            const hasBusiness = !!worker.businessRegistrationNumber && worker.businessRegistrationNumber.trim() !== '';
+            const vat = hasBusiness ? Math.floor(subTotal * 0.1) : 0;
+            const earned = subTotal + vat;
+
             const count = activeLogs.length;
             return { ...worker, earned, count };
         }).filter(w => w.count > 0);
@@ -189,7 +195,12 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
                 return sum + l.unit_price;
             }, 0);
 
-            return { ...worker, unpaidAmount: amount, count: logs.length };
+            // Apply VAT if business
+            const hasBusiness = !!worker.businessRegistrationNumber && worker.businessRegistrationNumber.trim() !== '';
+            const vat = hasBusiness ? Math.floor(amount * 0.1) : 0;
+            const totalAmount = amount + vat;
+
+            return { ...worker, unpaidAmount: totalAmount, count: logs.length };
         }).filter(w => w.unpaidAmount > 0);
 
         return { clientUnpaid, workerUnpaid };

@@ -116,7 +116,7 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
 
     if (isTotalPay) {
         // Total Mode
-        const totalJobPrice = (baseRatePerPerson * 10000); // 1. Rate is Total
+        const totalJobPrice = baseRatePerPerson; // 1. Rate is Total (Raw Won)
         const totalFee = feePerPerson; // 2. Fee is Total
 
         const totalWorkerPayPool = totalJobPrice - totalFee;
@@ -132,9 +132,10 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
         }
 
     } else {
-        // Individual Mode (Legacy)
-        standardUnitBillable = (baseRatePerPerson * 10000);
-        unitPayForWorker = standardUnitBillable - feePerPerson;
+        // Individual Mode (Updated to Cost-Plus)
+        // baseRatePerPerson is now treated as "Worker Cost" input
+        unitPayForWorker = baseRatePerPerson;
+        standardUnitBillable = unitPayForWorker + feePerPerson;
     }
 
     // Worker Pay Pool Calculation
@@ -158,7 +159,7 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
 
     let finalSupplyPrice: number;
     if (isTotalPay) {
-        finalSupplyPrice = (baseRatePerPerson * 10000); // Original Total
+        finalSupplyPrice = baseRatePerPerson; // Original Total
     } else {
         finalSupplyPrice = (standardUnitBillable * standardHeadcount);
     }
@@ -664,8 +665,11 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                     </h3>
                                     <div className="grid grid-cols-2 gap-4 text-sm">
                                         <div>
-                                            <span className="text-gray-600">기준 공급가({isTotalPay ? '전체' : '인당'}):</span> <span className="font-medium">
-                                                {isTotalPay ? (baseRatePerPerson * 10000).toLocaleString() : (standardUnitBillable).toLocaleString()}
+                                            {/* For Cost-Plus: baseRate (Input) is Worker Cost */}
+                                            <span className="text-gray-600">
+                                                {isTotalPay ? '기준 공급가(전체 Invoice)' : '기준 지급액(인당 Cost)'}:
+                                            </span> <span className="font-medium">
+                                                {baseRatePerPerson.toLocaleString()}
                                             </span>
                                         </div>
                                         <div>
@@ -674,10 +678,18 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                             </span>
                                         </div>
                                         <div>
-                                            <span className="text-gray-600">실 청구 공급가:</span> <span className="font-bold text-lg">{finalSupplyPrice.toLocaleString()}</span>
+                                            {/* Show Total Billable for Clarity */}
+                                            <span className="text-gray-600">청구 공급가(Total):</span> <span className="font-bold text-lg text-blue-600">
+                                                {finalSupplyPrice.toLocaleString()}
+                                            </span>
+                                            {!isTotalPay && (
+                                                <span className="text-xs text-gray-400 block">
+                                                    (인당 {standardUnitBillable.toLocaleString()}원 × {actualHeadcount || standardHeadcount}명)
+                                                </span>
+                                            )}
                                         </div>
                                         <div>
-                                            <span className="text-gray-600">부가세(10%):</span> <span className="font-medium">{finalVat.toLocaleString()}</span>
+                                            <span className="text-gray-600">부가세 (10%):</span> <span className="font-medium">{finalVat.toLocaleString()}</span>
                                         </div>
                                         <div className="col-span-2 border-t border-gray-200 mt-2 pt-2">
                                             <div className="flex justify-between font-bold text-lg">
@@ -699,10 +711,20 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                                    Actually totalWorkerPayPool is the accurate total. 
                                                    But finalPayPerWorker * actual matches the distributed amount. */}
                                             </div>
-                                            <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
+                                            <div className="flex justify-between items-center bg-green-50 p-2 rounded border border-green-200 mt-2">
+                                                <span className="text-sm font-bold text-green-800">예상 회사 수익 (수수료):</span>
+                                                <span className="font-bold text-green-900">
+                                                    {/* In Cost-Plus: Supply - WorkerPay. 
+                                                        Warning: if manualWorkerPay is used, Fee = Supply - ManualPay.
+                                                        If standard, Fee = (Cost+Fee) - Cost = Fee. Correct. */}
+                                                    {(finalSupplyPrice - (isManualWaiting ? manualWorkerPay * (actualHeadcount || 1) : Object.values(workerPayments).reduce((sum, p) => sum + p, 0))).toLocaleString()}원
+                                                </span>
+                                            </div>
+
+                                            <div className="flex justify-between items-center text-xs text-gray-500 mt-2">
                                                 <span>지급 기준 ({actualHeadcount > 0 ? actualHeadcount : standardHeadcount}명 분):</span>
                                                 <span>
-                                                    {isManualWaiting ? manualWorkerPay.toLocaleString() : finalPayPerWorker.toLocaleString()}원 (기본)
+                                                    {isManualWaiting ? manualWorkerPay.toLocaleString() : unitPayForWorker.toLocaleString()}원 (기본)
                                                 </span>
                                             </div>
                                         </div>
