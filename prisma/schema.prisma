@@ -64,6 +64,13 @@ model Worker {
   bank_account      String?
   residentRegistrationNumber String? // New: Resident Registration Number
   bankBookImage     String? // New: URL to bank book image
+  
+  // Business Info for "Individual Business" Workers
+  businessRegistrationNumber String?
+  companyName                String?
+  representativeName         String?
+  openingDate                String?
+  businessRegistrationImage  String?
   skill_level       String // 'Novice' | 'Intermediate' | 'Expert' | 'Specialist'
   contract_type     String? // 'Regular' | 'Daily'
   notes             String?
@@ -122,6 +129,8 @@ model WorkLogParticipation {
 
   workLog WorkLog @relation(fields: [workLogId], references: [id], onDelete: Cascade)
   worker  Worker  @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  payment Int @default(0) // Custom payment amount for this worker in this log
 
   @@unique([workLogId, workerId])
 }

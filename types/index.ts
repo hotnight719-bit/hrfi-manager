@@ -48,6 +48,14 @@ export interface Worker {
     bank_account?: string | null;
     residentRegistrationNumber?: string | null;
     bankBookImage?: string | null;
+
+    // Business Info
+    businessRegistrationNumber?: string | null;
+    companyName?: string | null;
+    representativeName?: string | null;
+    openingDate?: string | null;
+    businessRegistrationImage?: string | null;
+
     skill_level: string;
     contract_type?: string | null; // 정규 vs 비정기
     notes?: string | null;
@@ -64,6 +72,10 @@ export interface WorkLog {
     clientId: string;
     start_time?: string | null; // HH:mm
     worker_ids: string[]; // virtual field for UI
+    participations?: {
+        workerId: string;
+        payment: number;
+    }[];
 
     // Work Details
     volume_type: string;

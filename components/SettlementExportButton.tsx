@@ -4,14 +4,15 @@
 import { useState } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { Download, Image as ImageIcon, FileText } from 'lucide-react';
+import { Download, Image as ImageIcon, FileText, FileSpreadsheet } from 'lucide-react';
 
 interface SettlementExportButtonProps {
     targetId: string;
     fileName: string;
+    onExcelClick?: () => void;
 }
 
-export default function SettlementExportButton({ targetId, fileName }: SettlementExportButtonProps) {
+export default function SettlementExportButton({ targetId, fileName, onExcelClick }: SettlementExportButtonProps) {
     const [isExporting, setIsExporting] = useState(false);
 
     const handleExportImage = async () => {
@@ -76,6 +77,16 @@ export default function SettlementExportButton({ targetId, fileName }: Settlemen
 
     return (
         <div className="flex space-x-2">
+            {onExcelClick && (
+                <button
+                    onClick={onExcelClick}
+                    disabled={isExporting}
+                    className="flex items-center px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm font-medium"
+                >
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    엑셀 저장
+                </button>
+            )}
             <button
                 onClick={handleExportImage}
                 disabled={isExporting}

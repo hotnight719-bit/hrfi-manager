@@ -60,6 +60,13 @@ export default function WorkerList({ initialWorkers }: WorkerListProps) {
             if (url) bankBookUrl = url;
         }
 
+        const bizRegFile = formData.get('businessRegistrationImage_file') as File;
+        let bizRegUrl = editingWorker?.businessRegistrationImage;
+        if (bizRegFile && bizRegFile.size > 0) {
+            const url = await uploadFile(bizRegFile);
+            if (url) bizRegUrl = url;
+        }
+
         const workerData: Omit<Worker, 'id'> = {
             name: formData.get('name') as string,
             phone: formData.get('phone') as string,
@@ -74,6 +81,13 @@ export default function WorkerList({ initialWorkers }: WorkerListProps) {
             status: formData.get('status') as Worker['status'],
             notes: formData.get('notes') as string,
             teamId: selectedTeam?.id === 'ALL' ? '' : (selectedTeam?.id || ''),
+
+            // Business Info
+            businessRegistrationNumber: formData.get('businessRegistrationNumber') as string,
+            companyName: formData.get('companyName') as string,
+            representativeName: formData.get('representativeName') as string,
+            openingDate: formData.get('openingDate') as string,
+            businessRegistrationImage: bizRegUrl,
         };
 
         try {
@@ -262,6 +276,35 @@ export default function WorkerList({ initialWorkers }: WorkerListProps) {
                                     {editingWorker?.bankBookImage && (
                                         <a href={editingWorker.bankBookImage} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline mt-1 block">현재 등록된 통장사본 보기</a>
                                     )}
+                                </div>
+
+                                <div className="border-t pt-4 mt-4">
+                                    <h3 className="text-sm font-bold text-gray-900 mb-3">사업자 정보 (선택사항)</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">사업자등록번호</label>
+                                            <input name="businessRegistrationNumber" type="text" defaultValue={editingWorker?.businessRegistrationNumber || ''} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="000-00-00000" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">상호명</label>
+                                            <input name="companyName" type="text" defaultValue={editingWorker?.companyName || ''} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">대표자명</label>
+                                            <input name="representativeName" type="text" defaultValue={editingWorker?.representativeName || ''} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">개업일자</label>
+                                            <input name="openingDate" type="date" defaultValue={editingWorker?.openingDate || ''} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                        </div>
+                                    </div>
+                                    <div className="mt-4">
+                                        <label className="block text-sm font-medium text-gray-700">사업자등록증 사본</label>
+                                        <input name="businessRegistrationImage_file" type="file" accept="image/*" className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+                                        {editingWorker?.businessRegistrationImage && (
+                                            <a href={editingWorker.businessRegistrationImage} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 underline mt-1 block">현재 등록된 사업자등록증 보기</a>
+                                        )}
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">구분 (계약형태)</label>

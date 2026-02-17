@@ -38,6 +38,9 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
     const [manualBillable, setManualBillable] = useState<number>(0);
     const [manualWorkerPay, setManualWorkerPay] = useState<number>(0);
 
+    // Custom Worker Pay State
+    const [workerPayments, setWorkerPayments] = useState<Record<string, number>>({});
+
     // VAT & Payment Tracking
     const [isTaxFree, setIsTaxFree] = useState(false);
     const [isPaidFromClient, setIsPaidFromClient] = useState(false);
@@ -195,10 +198,13 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
             status: status,
             waiting_rate: status === 'Normal' ? 0 : waitingRate,
             manualWaitingBillable: isManualWaiting ? manualBillable : undefined,
-            manualWaitingWorkerPay: isManualWaiting ? manualWorkerPay : undefined,
+            participations: selectedWorkerIds.map(wid => ({
+                workerId: wid,
+                payment: workerPayments[wid] ?? finalPayPerWorker
+            })),
 
             unit_price: finalPayPerWorker,
-            total_payment_to_workers: (finalPayPerWorker * actualHeadcount),
+            total_payment_to_workers: isManualWaiting ? manualWorkerPay * actualHeadcount : Object.values(workerPayments).reduce((sum, p) => sum + p, 0),
 
             billable_amount: finalBillTotal,
             is_billed: false,
@@ -258,6 +264,15 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
             setManualWorkerPay(0);
         }
 
+        // Restore custom payments
+        const payments: Record<string, number> = {};
+        if (log.participations) {
+            log.participations.forEach(p => {
+                payments[p.workerId] = p.payment;
+            });
+        }
+        setWorkerPayments(payments);
+
         setIsTaxFree(log.isTaxFree || false);
         setIsPaidFromClient(log.isPaidFromClient || false);
         setEditingLogTeamId(log.teamId); // Preserve Team ID
@@ -265,8 +280,10 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
 
     const handleClientChange = (clientId: string) => {
         setSelectedClientId(clientId);
+        setSelectedClientId(clientId);
         setSelectedRateId('');
         setSelectedWorkerIds([]);
+        setWorkerPayments({});
         const client = initialClients.find(c => c.id === clientId);
         if (client) {
             setIsTaxFree(client.isTaxFree || false);
@@ -280,7 +297,9 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
         setSelectedClientId('');
         setSelectedRateId('');
         setSelectedTime('09:00');
+        setSelectedTime('09:00');
         setSelectedWorkerIds([]);
+        setWorkerPayments({});
         setStatus('Normal');
         setWaitingRate(0.3);
         setIsManualWaiting(false);
@@ -305,10 +324,26 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
     const toggleWorker = (id: string) => {
         if (selectedWorkerIds.includes(id)) {
             setSelectedWorkerIds(selectedWorkerIds.filter(wid => wid !== id));
+            const newPayments = { ...workerPayments };
+            delete newPayments[id];
+            setWorkerPayments(newPayments);
         } else {
             setSelectedWorkerIds([...selectedWorkerIds, id]);
+            // Initialize payment with current calculated default
+            setWorkerPayments({ ...workerPayments, [id]: finalPayPerWorker });
         }
     };
+
+    // Update individual worker payment
+    const handleWorkerPaymentChange = (id: string, amount: number) => {
+        setWorkerPayments({ ...workerPayments, [id]: amount });
+    };
+
+    // Update all selected workers payment when standard rate changes (optional, but good for UX)
+    // Actually, we use 'finalPayPerWorker' as default for new selections. 
+    // Existing selections should probably NOT change unless user explicitly wants to reset?
+    // Let's keep existing logic: manual overrides stick. 
+
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -654,15 +689,21 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                         <div className="col-span-2 mt-2 bg-white p-2 rounded border border-gray-200">
                                             <div className="flex justify-between items-center">
                                                 <span className="text-gray-600">인력 지급 총액:</span>
-                                                {/* Total Worker Pay is calculated as Pool * Status Factor */}
-                                                <span className="font-bold">{(finalPayPerWorker * (actualHeadcount || 1)).toLocaleString()}원</span>
+                                                {/* Total Worker Pay is sum of individual payments */}
+                                                <span className="font-bold">
+                                                    {isManualWaiting
+                                                        ? (manualWorkerPay * (actualHeadcount || 1)).toLocaleString()
+                                                        : Object.values(workerPayments).reduce((sum, p) => sum + p, 0).toLocaleString()}원
+                                                </span>
                                                 {/* Note: using (actualHeadcount || 1) to avoid 0 if no workers selected yet, just for preview? 
                                                    Actually totalWorkerPayPool is the accurate total. 
                                                    But finalPayPerWorker * actual matches the distributed amount. */}
                                             </div>
                                             <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
-                                                <span>인당 지급액 ({actualHeadcount > 0 ? actualHeadcount : standardHeadcount}명 분):</span>
-                                                <span>{finalPayPerWorker.toLocaleString()}원</span>
+                                                <span>지급 기준 ({actualHeadcount > 0 ? actualHeadcount : standardHeadcount}명 분):</span>
+                                                <span>
+                                                    {isManualWaiting ? manualWorkerPay.toLocaleString() : finalPayPerWorker.toLocaleString()}원 (기본)
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -688,6 +729,17 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                                         'Specialist': '전문'
                                                     }[worker.skill_level] || worker.skill_level}
                                                 </div>
+                                                {selectedWorkerIds.includes(worker.id) && (
+                                                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                                                        <label className="text-xs text-gray-600 block mb-1">지급액</label>
+                                                        <input
+                                                            type="number"
+                                                            value={workerPayments[worker.id] ?? finalPayPerWorker}
+                                                            onChange={(e) => handleWorkerPaymentChange(worker.id, parseInt(e.target.value) || 0)}
+                                                            className="w-full text-xs p-1 border rounded"
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>

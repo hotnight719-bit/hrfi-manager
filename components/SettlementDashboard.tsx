@@ -7,6 +7,7 @@ import SettlementExportButton from './SettlementExportButton';
 import WorkerSettlementModal from './WorkerSettlementModal';
 import ClientSettlementModal from './ClientSettlementModal';
 import { useTeam } from '@/context/TeamContext';
+import * as XLSX from 'xlsx';
 
 interface SettlementDashboardProps {
     initialClients: Client[];
@@ -29,9 +30,50 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
         return `${year}-W${week.toString().padStart(2, '0')}`;
     });
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10)); // YYYY-MM-DD
-    const [activeTab, setActiveTab] = useState<'summary' | 'client' | 'worker'>('summary');
+    const [activeTab, setActiveTab] = useState<'summary' | 'client' | 'worker' | 'unpaid'>('summary');
     const [selectedWorkerForReport, setSelectedWorkerForReport] = useState<Worker | null>(null);
     const [selectedClientForReport, setSelectedClientForReport] = useState<Client | null>(null);
+
+    // Popup State
+    const [activeClientPopup, setActiveClientPopup] = useState<{ client: Client, x: number, y: number } | null>(null);
+
+    const handleClientClick = (e: React.MouseEvent, client: Client) => {
+        e.stopPropagation(); // Prevent row click or other bubbles
+        const rect = e.currentTarget.getBoundingClientRect();
+        // Toggle if clicking same client, otherwise open new
+        if (activeClientPopup?.client.id === client.id) {
+            setActiveClientPopup(null);
+        } else {
+            setActiveClientPopup({
+                client,
+                x: rect.left + window.scrollX,
+                y: rect.bottom + window.scrollY
+            });
+        }
+    };
+
+    const closePopup = () => {
+        setActiveClientPopup(null);
+        setActiveWorkerPopup(null);
+    };
+
+    const [activeWorkerPopup, setActiveWorkerPopup] = useState<{ worker: Worker, x: number, y: number } | null>(null);
+
+    const handleWorkerClick = (e: React.MouseEvent, worker: Worker) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        if (activeWorkerPopup?.worker.id === worker.id) {
+            setActiveWorkerPopup(null);
+        } else {
+            setActiveWorkerPopup({
+                worker,
+                x: rect.left + window.scrollX,
+                y: rect.bottom + window.scrollY
+            });
+        }
+    };
+
+
 
     const { selectedTeam } = useTeam();
     const isGlobalMode = selectedTeam?.id === 'ALL';
@@ -105,6 +147,110 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
         }).filter(w => w.count > 0);
     }, [initialWorkers, filteredLogs]);
 
+    // 4. Unpaid Stats (Across ALL time, or just current filter? Usually Unpaid is "Total Outstanding")
+    // But filters might be useful. Let's stick to current filter for consistency, 
+    // OR create a separate "unpaidLogs" derived from 'initialLogs' (ignoring date)
+    // if the user wants to see "Current Status of Everything".
+    // Requirement: "미정산 내역 대시보드". Usually implies "Current Outstanding".
+    // Let's us 'initialLogs' (which is all fetched logs) for calculating TOTAL unpaid.
+    // NOTE: 'initialLogs' depends on what the server passes. If server passes all, we are good.
+    const unpaidStats = useMemo(() => {
+        // Client Unpaid (Receivables)
+        const clientUnpaid = initialClients.map(client => {
+            const logs = initialLogs.filter(l => l.clientId === client.id && !l.isPaidFromClient);
+            const amount = logs.reduce((sum, l) => sum + (l.billable_amount || 0), 0);
+            return { ...client, unpaidAmount: amount, count: logs.length };
+        }).filter(c => c.unpaidAmount > 0);
+
+        // Worker Unpaid (Payables)
+        const workerUnpaid = initialWorkers.map(worker => {
+            // Find logs where this worker worked AND is_paid_to_workers is false
+            const logs = initialLogs.filter(l => l.worker_ids.includes(worker.id) && !l.is_paid_to_workers);
+            // Calculate detailed pay. 
+            // Note: worker_ids is just virtual in WorkLog type in this file context? 
+            // We need to check actual participation measurement if possible, but 'unit_price' in WorkLog 
+            // is "per person" payment.
+            // Wait, 'unit_price' is stored on WorkLog.
+            // If custom payment was used (participations), we need to check that.
+            // But 'initialLogs' might not have deep 'participations' data if not included?
+            // checking 'types/index.ts', WorkLog has 'participations'.
+            // In 'SettlementDashboard', we are using `initialLogs`.
+            // Let's assume we can sum up `unit_price` for now, or refine if `participations` is available.
+            // For now, let's use `l.unit_price` which is the "default" or "per person" rate. 
+            // If custom pay is implemented, `l.participations` should be used.
+            // Let's check if we can access `participations` on `initialLogs`.
+            // The `WorkLog` interface has `participations?: ...`.
+
+            const amount = logs.reduce((sum, l) => {
+                if (l.participations && l.participations.length > 0) {
+                    const p = l.participations.find(p => p.workerId === worker.id);
+                    return sum + (p ? p.payment : 0);
+                }
+                return sum + l.unit_price;
+            }, 0);
+
+            return { ...worker, unpaidAmount: amount, count: logs.length };
+        }).filter(w => w.unpaidAmount > 0);
+
+        return { clientUnpaid, workerUnpaid };
+    }, [initialClients, initialWorkers, initialLogs]);
+
+    const handleDownloadExcel = () => {
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: Summary
+        const summaryData = [
+            { 항목: '총 청구액 (매출)', 금액: totalBilled },
+            { 항목: '총 노무비 (매입)', 금액: totalPayout },
+            { 항목: '예상 마진 (수익)', 금액: totalMargin },
+        ];
+        const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, wsSummary, '요약');
+
+        // Sheet 2: Client Stats
+        const clientData = clientStats.map(c => ({
+            팀: c.team?.name || '공통',
+            거래처명: c.name,
+            작업횟수: c.count,
+            청구금액: c.billed,
+            수금액: c.collected,
+            미수금: c.receivables
+        }));
+        const wsClient = XLSX.utils.json_to_sheet(clientData);
+        XLSX.utils.book_append_sheet(wb, wsClient, '거래처별 현황');
+
+        // Sheet 3: Worker Stats
+        const workerData = workerStats.map(w => ({
+            팀: w.team?.name || '공통',
+            성명: w.name,
+            숙련도: w.skill_level,
+            작업횟수: w.count,
+            지급액: w.earned
+        }));
+        const wsWorker = XLSX.utils.json_to_sheet(workerData);
+        XLSX.utils.book_append_sheet(wb, wsWorker, '인력별 현황');
+
+        // Sheet 4: Raw Logs (Optional but helpful)
+        const logData = filteredLogs.map(l => {
+            const client = initialClients.find(c => c.id === l.clientId);
+            return {
+                날짜: l.date,
+                시간: l.start_time,
+                거래처: client?.name || 'Unknown',
+                작업내용: l.volume_type,
+                상태: l.status,
+                청구액: l.billable_amount,
+                지급액: l.total_payment_to_workers,
+                비고: l.notes
+            };
+        });
+        const wsLogs = XLSX.utils.json_to_sheet(logData);
+        XLSX.utils.book_append_sheet(wb, wsLogs, '작업내역상세');
+
+        const fileName = `settlement-${cycle}-${cycle === 'Monthly' ? selectedMonth : (cycle === 'Weekly' ? selectedWeek : selectedDate)}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    };
+
 
     return (
         <div className="space-y-6">
@@ -174,11 +320,18 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
                         >
                             인력별
                         </button>
+                        <button
+                            className={`px-4 py-2 rounded font-medium transition-colors ${activeTab === 'unpaid' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                            onClick={() => setActiveTab('unpaid')}
+                        >
+                            미정산 현황
+                        </button>
                     </div>
 
                     <SettlementExportButton
                         targetId="settlement-report-area"
                         fileName={`settlement-${cycle}-${cycle === 'Monthly' ? selectedMonth : (cycle === 'Weekly' ? selectedWeek : selectedDate)}`}
+                        onExcelClick={handleDownloadExcel}
                     />
                 </div>
             </div>
@@ -301,6 +454,92 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
                         </div>
                     </div>
                 )}
+                {/* Unpaid Tab */}
+                {activeTab === 'unpaid' && (
+                    <div className="space-y-6">
+                        {/* Client Unpaid */}
+                        <div className="bg-white shadow rounded-lg overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-200 bg-red-50">
+                                <h3 className="font-bold text-lg text-red-800">거래처 미수금 현황 (전체)</h3>
+                                <p className="text-sm text-red-600">
+                                    총 미수금: {unpaidStats.clientUnpaid.reduce((sum, c) => sum + c.unpaidAmount, 0).toLocaleString()}원
+                                </p>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">거래처명</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">미수 건수</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">미수금액</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {unpaidStats.clientUnpaid.map(c => (
+                                            <tr key={c.id}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    <span
+                                                        className="cursor-pointer border-b border-dotted border-gray-400 hover:text-blue-600 text-blue-600 font-bold"
+                                                        onClick={(e) => handleClientClick(e, c)}
+                                                    >
+                                                        {c.name}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{c.count}건</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600 text-right">{c.unpaidAmount.toLocaleString()}원</td>
+                                            </tr>
+                                        ))}
+                                        {unpaidStats.clientUnpaid.length === 0 && (
+                                            <tr><td colSpan={3} className="px-6 py-4 text-center text-gray-500">미수금 내역이 없습니다.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Worker Unpaid */}
+                        <div className="bg-white shadow rounded-lg overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-200 bg-orange-50">
+                                <h3 className="font-bold text-lg text-orange-800">인력 미지급 현황 (전체)</h3>
+                                <p className="text-sm text-orange-600">
+                                    총 미지급액: {unpaidStats.workerUnpaid.reduce((sum, w) => sum + w.unpaidAmount, 0).toLocaleString()}원
+                                </p>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">성명</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">미지급 건수</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">미지급액</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {unpaidStats.workerUnpaid.map(w => (
+                                            <tr key={w.id}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    <span
+                                                        className="cursor-pointer border-b border-dotted border-gray-400 hover:text-orange-600 text-orange-700 font-bold"
+                                                        onClick={(e) => handleWorkerClick(e, w)}
+                                                    >
+                                                        {w.name}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{w.count}건</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-orange-600 text-right">{w.unpaidAmount.toLocaleString()}원</td>
+                                            </tr>
+                                        ))}
+                                        {unpaidStats.workerUnpaid.length === 0 && (
+                                            <tr><td colSpan={3} className="px-6 py-4 text-center text-gray-500">미지급 내역이 없습니다.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+
             </div>
 
             {/* Settlement Report Modal */}
@@ -332,6 +571,139 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
                     }
                     onClose={() => setSelectedClientForReport(null)}
                 />
+            )}
+
+            {/* Client Info Popup */}
+            {activeClientPopup && (
+                <div
+                    className="fixed z-50 bg-white p-4 rounded-lg shadow-2xl border border-gray-200 text-sm"
+                    style={{
+                        top: activeClientPopup.y + 10,
+                        left: activeClientPopup.x,
+                        minWidth: '280px',
+                        maxWidth: '320px'
+                    }}
+                >
+                    <div className="flex justify-between items-center mb-3 border-b pb-2">
+                        <h4 className="font-bold text-gray-900 text-base">{activeClientPopup.client.name}</h4>
+                        <button
+                            onClick={closePopup}
+                            className="text-gray-400 hover:text-gray-600"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div className="space-y-2.5">
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500 col-span-1 font-medium">사업자번호</span>
+                            <span className="col-span-2 text-gray-900">{activeClientPopup.client.businessRegistrationNumbers?.[0] || '-'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500 col-span-1 font-medium">대표자명</span>
+                            <span className="col-span-2 text-gray-900">{activeClientPopup.client.businessOwnerNames?.[0] || '-'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500 col-span-1 font-medium">이메일</span>
+                            <span className="col-span-2 text-gray-900 break-all">{activeClientPopup.client.taxInvoiceEmail || '-'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500 col-span-1 font-medium">연락처</span>
+                            <span className="col-span-2 text-gray-900">{activeClientPopup.client.contact_info || '-'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500 col-span-1 font-medium">주소</span>
+                            <span className="col-span-2 text-gray-900">{activeClientPopup.client.address || '-'}</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Worker Info Popup */}
+            {activeWorkerPopup && (
+                <div
+                    className="fixed z-50 bg-white p-4 rounded-lg shadow-2xl border border-gray-200 text-sm"
+                    style={{
+                        top: activeWorkerPopup.y + 10,
+                        left: activeWorkerPopup.x,
+                        minWidth: '280px',
+                        maxWidth: '320px'
+                    }}
+                >
+                    <div className="flex justify-between items-center mb-3 border-b pb-2">
+                        <h4 className="font-bold text-gray-900 text-base">{activeWorkerPopup.worker.name}</h4>
+                        <button
+                            onClick={closePopup}
+                            className="text-gray-400 hover:text-gray-600"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div className="space-y-2.5">
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500 col-span-1 font-medium">주민번호</span>
+                            <span className="col-span-2 text-gray-900 font-mono">{activeWorkerPopup.worker.residentRegistrationNumber || '-'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500 col-span-1 font-medium">은행명</span>
+                            <span className="col-span-2 text-gray-900">{activeWorkerPopup.worker.bank_name || '-'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500 col-span-1 font-medium">계좌번호</span>
+                            <span className="col-span-2 text-gray-900 font-mono">{activeWorkerPopup.worker.bank_account || '-'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500 col-span-1 font-medium">연락처</span>
+                            <span className="col-span-2 text-gray-900">{activeWorkerPopup.worker.phone || '-'}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-gray-500 col-span-1 font-medium">주소</span>
+                            <span className="col-span-2 text-gray-900">{activeWorkerPopup.worker.address || '-'}</span>
+                        </div>
+
+                        {(activeWorkerPopup.worker.businessRegistrationNumber || activeWorkerPopup.worker.companyName) && (
+                            <div className="border-t pt-2 mt-2">
+                                <h5 className="font-bold text-gray-900 mb-1 text-xs">사업자 정보</h5>
+                                <div className="space-y-1">
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <span className="text-gray-500 col-span-1 font-medium">사업자번호</span>
+                                        <span className="col-span-2 text-gray-900 font-mono">{activeWorkerPopup.worker.businessRegistrationNumber || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <span className="text-gray-500 col-span-1 font-medium">상호명</span>
+                                        <span className="col-span-2 text-gray-900">{activeWorkerPopup.worker.companyName || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <span className="text-gray-500 col-span-1 font-medium">대표자</span>
+                                        <span className="col-span-2 text-gray-900">{activeWorkerPopup.worker.representativeName || '-'}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <span className="text-gray-500 col-span-1 font-medium">개업일자</span>
+                                        <span className="col-span-2 text-gray-900">{activeWorkerPopup.worker.openingDate || '-'}</span>
+                                    </div>
+                                    {activeWorkerPopup.worker.businessRegistrationImage && (
+                                        <div className="grid grid-cols-3 gap-2 mt-1">
+                                            <span className="text-gray-500 col-span-1 font-medium">사본</span>
+                                            <span className="col-span-2 text-gray-900">
+                                                <a
+                                                    href={activeWorkerPopup.worker.businessRegistrationImage}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-600 underline text-xs"
+                                                >
+                                                    [이미지 보기]
+                                                </a>
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
             )}
         </div>
     );

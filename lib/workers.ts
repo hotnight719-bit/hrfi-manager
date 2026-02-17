@@ -25,6 +25,13 @@ export async function addWorker(worker: Omit<Worker, 'id'>): Promise<Worker> {
             bank_account: worker.bank_account,
             residentRegistrationNumber: worker.residentRegistrationNumber,
             bankBookImage: worker.bankBookImage,
+
+            businessRegistrationNumber: worker.businessRegistrationNumber,
+            companyName: worker.companyName,
+            representativeName: worker.representativeName,
+            openingDate: worker.openingDate,
+            businessRegistrationImage: worker.businessRegistrationImage,
+
             skill_level: worker.skill_level,
             contract_type: worker.contract_type,
             notes: worker.notes,

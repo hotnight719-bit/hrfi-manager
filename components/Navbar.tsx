@@ -57,8 +57,8 @@ export default function Navbar({ user }: NavbarProps) {
             <div className="w-full mx-auto px-4">
                 <div className="flex justify-between h-16">
                     <div className="flex items-center">
-                        <div className="flex-shrink-0 flex items-center mr-6">
-                            <Link href="/" className="font-bold text-xl text-yellow-500">퍼플홀딩스 관리시스템</Link>
+                        <div className="flex-shrink-0 flex items-center mr-2 md:mr-6">
+                            <Link href="/" className="font-bold text-lg md:text-xl text-yellow-500 whitespace-nowrap">퍼플홀딩스 관리</Link>
                         </div>
 
                         {/* Team Selector - Desktop Only (XL+) */}
@@ -122,13 +122,13 @@ export default function Navbar({ user }: NavbarProps) {
                                 {/* Username hidden to save space */}
                                 <button
                                     onClick={async () => await logout()}
-                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm md:text-base"
+                                    className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 md:px-3 rounded text-xs md:text-base whitespace-nowrap"
                                 >
                                     로그아웃
                                 </button>
                             </div>
                         ) : (
-                            <Link href="/login" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm xl:text-base">
+                            <Link href="/login" className="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 md:px-3 rounded text-xs md:text-base whitespace-nowrap">
                                 로그인
                             </Link>
                         )}

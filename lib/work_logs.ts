@@ -19,6 +19,7 @@ export async function getWorkLogs(teamId?: string): Promise<WorkLog[]> {
 
         status: (log.status as 'Normal' | 'Waiting' | 'Cancelled') || 'Normal',
         worker_ids: (log as any).participations.map((p: any) => p.workerId),
+        participations: (log as any).participations.map((p: any) => ({ workerId: p.workerId, payment: p.payment })),
         start_time: log.start_time || undefined,
         notes: log.notes || undefined,
 
@@ -57,9 +58,15 @@ export async function addWorkLog(log: Omit<WorkLog, 'id'>): Promise<WorkLog> {
             clientId: log.clientId,
             teamId: log.teamId,
             participations: {
-                create: log.worker_ids.map(workerId => ({
-                    workerId
-                }))
+                create: log.participations
+                    ? log.participations.map(p => ({
+                        workerId: p.workerId,
+                        payment: p.payment
+                    }))
+                    : log.worker_ids.map(workerId => ({
+                        workerId,
+                        payment: 0
+                    }))
             }
         } as any,
         include: { participations: true }
@@ -68,6 +75,7 @@ export async function addWorkLog(log: Omit<WorkLog, 'id'>): Promise<WorkLog> {
     return {
         ...newLog,
         worker_ids: (newLog as any).participations.map((p: any) => p.workerId),
+        participations: (newLog as any).participations.map((p: any) => ({ workerId: p.workerId, payment: p.payment })),
 
         status: (newLog.status as 'Normal' | 'Waiting' | 'Cancelled') || 'Normal',
         start_time: newLog.start_time || undefined,
@@ -85,10 +93,10 @@ export async function addWorkLog(log: Omit<WorkLog, 'id'>): Promise<WorkLog> {
 
 export async function updateWorkLog(id: string, updates: Partial<WorkLog>): Promise<WorkLog | null> {
     try {
-        const { worker_ids, ...data } = updates;
+        const { worker_ids, participations, ...data } = updates;
 
         // Transaction handling for updating relations if worker_ids changed
-        if (worker_ids) {
+        if (worker_ids || participations) {
             // Delete existing participations and create new ones
             // Functionally equivalent to "set"
             return await prisma.$transaction(async (tx) => {
@@ -97,11 +105,20 @@ export async function updateWorkLog(id: string, updates: Partial<WorkLog>): Prom
                 });
 
                 // Create new ones
-                await tx.workLogParticipation.createMany({
-                    data: worker_ids.map(wid => ({
+                const participationsData = participations
+                    ? participations.map(p => ({
                         workLogId: id,
-                        workerId: wid
+                        workerId: p.workerId,
+                        payment: p.payment
                     }))
+                    : (worker_ids || []).map(wid => ({
+                        workLogId: id,
+                        workerId: wid,
+                        payment: 0
+                    }));
+
+                await tx.workLogParticipation.createMany({
+                    data: participationsData
                 });
 
                 const updated = await tx.workLog.update({
@@ -113,6 +130,7 @@ export async function updateWorkLog(id: string, updates: Partial<WorkLog>): Prom
                 return {
                     ...updated,
                     worker_ids: (updated as any).participations.map((p: any) => p.workerId),
+                    participations: (updated as any).participations.map((p: any) => ({ workerId: p.workerId, payment: p.payment })),
 
                     status: (updated.status as 'Normal' | 'Waiting' | 'Cancelled') || 'Normal',
                     start_time: updated.start_time || undefined,
@@ -137,6 +155,7 @@ export async function updateWorkLog(id: string, updates: Partial<WorkLog>): Prom
             return {
                 ...updated,
                 worker_ids: (updated as any).participations.map((p: any) => p.workerId),
+                participations: (updated as any).participations.map((p: any) => ({ workerId: p.workerId, payment: p.payment })),
 
                 status: (updated.status as 'Normal' | 'Waiting' | 'Cancelled') || 'Normal',
                 start_time: updated.start_time || undefined,
