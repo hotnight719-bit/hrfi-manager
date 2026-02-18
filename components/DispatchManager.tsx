@@ -172,7 +172,7 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
     let finalBillTotal = finalSupplyPrice + finalVat;
 
     // Manual Override Logic
-    if (isManualWaiting && (status === 'Waiting' || status === 'Cancelled')) {
+    if (isManualWaiting) {
         finalBillTotal = manualBillable;
         finalPayPerWorker = manualWorkerPay;
 
