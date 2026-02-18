@@ -213,7 +213,7 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
             unit_price: finalPayPerWorker,
             total_payment_to_workers: isManualWaiting
                 ? manualWorkerPay * (selectedWorkerIds.length > 0 ? selectedWorkerIds.length : actualHeadcount)
-                : Object.values(workerPayments).reduce((sum, p) => sum + p, 0),
+                : selectedWorkerIds.reduce((sum, wid) => sum + (workerPayments[wid] ?? finalPayPerWorker), 0),
 
             billable_amount: finalBillTotal,
             is_billed: false,
