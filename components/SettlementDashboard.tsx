@@ -152,7 +152,37 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
     // --- Aggregation Logic ---
 
     // 1. Total Metrics
-    const totalPayout = filteredLogs.reduce((sum, log) => sum + log.total_payment_to_workers, 0); // Cost
+    // Calculate Total Payout dynamically to include VAT for business workers
+    // Start with raw total_payment_to_workers from DB
+    // But we need to add VAT if applicable. 
+    // Since we don't store VAT separately in WorkLog, we must re-derive it based on Worker ID.
+    const totalPayout = filteredLogs.reduce((sum, log) => {
+        let logCost = log.total_payment_to_workers;
+
+        // Add VAT for business workers if participation details exist
+        // Note: total_payment_to_workers in DB excludes VAT mostly.
+        if (log.participations && log.participations.length > 0) {
+            log.participations.forEach(p => {
+                const worker = initialWorkers.find(w => w.id === p.workerId);
+                if (worker && worker.businessRegistrationNumber) {
+                    logCost += Math.floor(p.payment * 0.1);
+                }
+            });
+        } else {
+            // Fallback if no participations (e.g. legacy or just headcount)
+            // If we can identify workers from worker_ids?
+            log.worker_ids.forEach(wid => {
+                const worker = initialWorkers.find(w => w.id === wid);
+                if (worker && worker.businessRegistrationNumber) {
+                    // Estimate portion? 
+                    // If equal split:
+                    const portion = log.total_payment_to_workers / log.worker_ids.length;
+                    logCost += Math.floor(portion * 0.1);
+                }
+            });
+        }
+        return sum + logCost;
+    }, 0);
 
     const totalBilled = filteredLogs.reduce((sum, log) => sum + (log.billable_amount || 0), 0);
     const totalSupply = Math.round(totalBilled / 1.1); // Approx
@@ -174,7 +204,13 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
     const workerStats = useMemo(() => {
         return initialWorkers.map(worker => {
             const activeLogs = filteredLogs.filter(l => l.worker_ids.includes(worker.id));
-            const subTotal = activeLogs.reduce((sum, l) => sum + l.unit_price, 0);
+            const subTotal = activeLogs.reduce((sum, l) => {
+                if (l.participations && l.participations.length > 0) {
+                    const p = l.participations.find(p => p.workerId === worker.id);
+                    return sum + (p ? p.payment : 0);
+                }
+                return sum + l.unit_price;
+            }, 0);
 
             // Apply VAT if business
             const hasBusiness = !!worker.businessRegistrationNumber && worker.businessRegistrationNumber.trim() !== '';
