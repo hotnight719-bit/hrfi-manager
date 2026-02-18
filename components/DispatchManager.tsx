@@ -642,21 +642,27 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">최종 청구액 (VAT 포함)</label>
                                                 <input
-                                                    type="number"
-                                                    value={manualBillable}
-                                                    onChange={(e) => setManualBillable(parseInt(e.target.value) || 0)}
+                                                    type="text"
+                                                    value={manualBillable === 0 ? '' : manualBillable.toLocaleString()}
+                                                    onChange={(e) => {
+                                                        const val = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                                                        setManualBillable(val);
+                                                    }}
                                                     className="w-full border rounded-md p-2"
-                                                    placeholder="예: 50000"
+                                                    placeholder="예: 50,000"
                                                 />
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">인당 지급액</label>
                                                 <input
-                                                    type="number"
-                                                    value={manualWorkerPay}
-                                                    onChange={(e) => setManualWorkerPay(parseInt(e.target.value) || 0)}
+                                                    type="text"
+                                                    value={manualWorkerPay === 0 ? '' : manualWorkerPay.toLocaleString()}
+                                                    onChange={(e) => {
+                                                        const val = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                                                        setManualWorkerPay(val);
+                                                    }}
                                                     className="w-full border rounded-md p-2"
-                                                    placeholder="예: 30000"
+                                                    placeholder="예: 30,000"
                                                 />
                                             </div>
                                         </div>
@@ -763,10 +769,14 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                                     <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                                                         <label className="text-xs text-gray-600 block mb-1">지급액</label>
                                                         <input
-                                                            type="number"
-                                                            value={workerPayments[worker.id] ?? finalPayPerWorker}
-                                                            onChange={(e) => handleWorkerPaymentChange(worker.id, parseInt(e.target.value) || 0)}
+                                                            type="text"
+                                                            value={(workerPayments[worker.id] ?? finalPayPerWorker) === 0 && !workerPayments[worker.id] ? '' : (workerPayments[worker.id] ?? finalPayPerWorker).toLocaleString()}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value === '' ? 0 : (parseInt(e.target.value.replace(/,/g, '')) || 0);
+                                                                handleWorkerPaymentChange(worker.id, val);
+                                                            }}
                                                             className="w-full text-xs p-1 border rounded"
+                                                            placeholder="0"
                                                         />
                                                     </div>
                                                 )}

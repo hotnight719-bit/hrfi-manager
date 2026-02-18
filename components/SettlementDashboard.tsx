@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { Client, Worker, WorkLog } from '@/types';
-import { Calendar, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, FileText, Image as ImageIcon, CheckSquare, Square, Clock, Calendar, Filter } from 'lucide-react';
 import SettlementExportButton from './SettlementExportButton';
 import WorkerSettlementModal from './WorkerSettlementModal';
 import ClientSettlementModal from './ClientSettlementModal';
@@ -130,9 +130,37 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
         end.setDate(end.getDate() + 6);
 
         return {
-            start: start.toISOString().slice(0, 10),
-            end: end.toISOString().slice(0, 10)
+            start: start.toISOString().split('T')[0],
+            end: end.toISOString().split('T')[0],
+            startDate: start,
+            endDate: end
         };
+    };
+
+    const formatWeekLabel = (weekStr: string) => {
+        if (!weekStr) return '';
+        const { startDate, endDate } = getWeekRange(weekStr);
+        const month = startDate.getMonth() + 1;
+
+        // Calculate week number within month
+        const firstDayOfMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+        const dayOfMonth = startDate.getDate();
+        const weekInvolving = Math.ceil((dayOfMonth + firstDayOfMonth.getDay()) / 7); // Rough estimate
+
+        // More accurate "Nth week of Month":
+        // ISO weeks can straddle months. Let's just use Start Date's Month.
+        // And maybe calculate offset? 
+        // Simple approach: "M월 N주차 (M/D~M/D)"
+
+        const startStr = `${startDate.getMonth() + 1}/${startDate.getDate()}`;
+        const endStr = `${endDate.getMonth() + 1}/${endDate.getDate()}`;
+
+        // Calculate N-th week based on day of month? 
+        // Or just use the Week Number?
+        // User asked "2월의 몇번째 주". 
+        const weekNum = Math.ceil(startDate.getDate() / 7);
+
+        return `${month}월 ${weekNum}주차 (${startStr}~${endStr})`;
     };
 
     const filteredLogs = useMemo(() => {
@@ -361,12 +389,18 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
                             />
                         )}
                         {cycle === 'Weekly' && (
-                            <input
-                                type="week"
-                                value={selectedWeek}
-                                onChange={(e) => setSelectedWeek(e.target.value)}
-                                className="border rounded px-3 py-2"
-                            />
+                            <div className="relative">
+                                <input
+                                    type="week"
+                                    value={selectedWeek}
+                                    onChange={(e) => setSelectedWeek(e.target.value)}
+                                    className="border rounded-md p-2 w-full opacity-0 absolute inset-0 cursor-pointer"
+                                />
+                                <div className="border rounded-md p-2 w-full bg-white flex items-center justify-between pointer-events-none">
+                                    <span>{selectedWeek ? formatWeekLabel(selectedWeek) : '주간 선택'}</span>
+                                    <Clock className="w-4 h-4 text-gray-500" />
+                                </div>
+                            </div>
                         )}
                         {cycle === 'Daily' && (
                             <input
