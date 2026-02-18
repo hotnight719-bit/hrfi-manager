@@ -674,151 +674,150 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                     </div>
                                 </div>
                             </div>
-                            </div>
-                )}
-            </div>
-                )}
-
-            {selectedRate && (
-                <div className="mt-6 border-t pt-4">
-                    <div className={`mb-4 p-4 rounded-md ${status === 'Normal' ? 'bg-blue-50' : 'bg-orange-50'}`}>
-                        <h3 className={`font-semibold mb-2 ${status === 'Normal' ? 'text-blue-900' : 'text-orange-900'}`}>
-                            {status === 'Normal' ? `정상 정산 미리보기 (${isTotalPay ? '전체 총액' : '인당'})` : `대기/취소 정산 (${waitingRate * 100}%)`}
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                                {/* For Cost-Plus: baseRate (Input) is Worker Cost */}
-                                <span className="text-gray-600">
-                                    {isTotalPay ? '기준 공급가(전체 Invoice)' : '기준 지급액(인당 Cost)'}:
-                                </span> <span className="font-medium">
-                                    {baseRatePerPerson.toLocaleString()}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="text-gray-600">{isTotalPay ? '총 수수료:' : '인당 수수료:'}</span> <span className="font-medium">
-                                    +{feePerPerson.toLocaleString()}
-                                </span>
-                            </div>
-                            <div>
-                                {/* Show Total Billable for Clarity */}
-                                <span className="text-gray-600">청구 공급가(Total):</span> <span className="font-bold text-lg text-blue-600">
-                                    {finalSupplyPrice.toLocaleString()}
-                                </span>
-                                {!isTotalPay && (
-                                    <span className="text-xs text-gray-400 block">
-                                        (인당 {standardUnitBillable.toLocaleString()}원 × {actualHeadcount || standardHeadcount}명)
-                                    </span>
-                                )}
-                            </div>
-                            <div>
-                                <span className="text-gray-600">부가세 (10%):</span> <span className="font-medium">{finalVat.toLocaleString()}</span>
-                            </div>
-                            <div className="col-span-2 border-t border-gray-200 mt-2 pt-2">
-                                <div className="flex justify-between font-bold text-lg">
-                                    <span>최종 청구액:</span>
-                                    <span>{finalBillTotal.toLocaleString()}원</span>
-                                </div>
-                            </div>
-
-                            <div className="col-span-2 mt-2 bg-white p-2 rounded border border-gray-200">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">인력 지급 총액:</span>
-                                    {/* Total Worker Pay is sum of individual payments */}
-                                    <span className="font-bold">
-                                        {(isManualWaiting && (status === 'Waiting' || status === 'Cancelled'))
-                                            ? (manualWorkerPay * (actualHeadcount || 1)).toLocaleString()
-                                            : Object.values(workerPayments).reduce((sum, p) => sum + p, 0).toLocaleString()}원
-                                    </span>
-                                    {/* Note: using (actualHeadcount || 1) to avoid 0 if no workers selected yet, just for preview? 
-                                                   Actually totalWorkerPayPool is the accurate total. 
-                                                   But finalPayPerWorker * actual matches the distributed amount. */}
-                                </div>
-                                <div className="flex justify-between items-center bg-green-50 p-2 rounded border border-green-200 mt-2">
-                                    <span className="text-sm font-bold text-green-800">예상 회사 수익 (수수료):</span>
-                                    <span className="font-bold text-green-900">
-                                        {/* In Cost-Plus: Supply - WorkerPay. 
-                                                        Warning: if manualWorkerPay is used, Fee = Supply - ManualPay.
-                                                        If standard, Fee = (Cost+Fee) - Cost = Fee. Correct. */}
-                                        {(finalSupplyPrice - ((isManualWaiting && (status === 'Waiting' || status === 'Cancelled')) ? manualWorkerPay * (actualHeadcount || 1) : Object.values(workerPayments).reduce((sum, p) => sum + p, 0))).toLocaleString()}원
-                                    </span>
-                                </div>
-
-                                <div className="flex justify-between items-center text-xs text-gray-500 mt-2">
-                                    <span>지급 기준 ({actualHeadcount > 0 ? actualHeadcount : standardHeadcount}명 분):</span>
-                                    <span>
-                                        {(isManualWaiting && (status === 'Waiting' || status === 'Cancelled')) ? manualWorkerPay.toLocaleString() : unitPayForWorker.toLocaleString()}원 (기본)
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
+                        )}
                     </div>
+                )}
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            투입 인력 선택 {actualHeadcount > 0 ? `(${actualHeadcount}명)` : '(미배정 - 추후 확정 가능)'}
-                        </label>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto border rounded-md p-2">
-                            {initialWorkers.map(worker => (
-                                <div
-                                    key={worker.id}
-                                    onClick={() => toggleWorker(worker.id)}
-                                    className={`p-2 rounded cursor-pointer border ${selectedWorkerIds.includes(worker.id) ? 'bg-blue-100 border-blue-500' : 'hover:bg-gray-50 border-gray-200'}`}
-                                >
-                                    <div className="font-medium text-sm">{worker.name}</div>
-                                    <div className="text-xs text-gray-500">
-                                        {{
-                                            'Novice': '초급',
-                                            'Intermediate': '중급',
-                                            'Expert': '고급',
-                                            'Specialist': '전문'
-                                        }[worker.skill_level] || worker.skill_level}
-                                    </div>
-                                    {selectedWorkerIds.includes(worker.id) && (
-                                        <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                                            <label className="text-xs text-gray-600 block mb-1">지급액</label>
-                                            <input
-                                                type="text"
-                                                value={(workerPayments[worker.id] ?? finalPayPerWorker) === 0 && !workerPayments[worker.id] ? '' : (workerPayments[worker.id] ?? finalPayPerWorker).toLocaleString()}
-                                                onChange={(e) => {
-                                                    const val = e.target.value === '' ? 0 : (parseInt(e.target.value.replace(/,/g, '')) || 0);
-                                                    handleWorkerPaymentChange(worker.id, val);
-                                                }}
-                                                className="w-full text-xs p-1 border rounded"
-                                                placeholder="0"
-                                            />
-                                        </div>
+                {selectedRate && (
+                    <div className="mt-6 border-t pt-4">
+                        <div className={`mb-4 p-4 rounded-md ${status === 'Normal' ? 'bg-blue-50' : 'bg-orange-50'}`}>
+                            <h3 className={`font-semibold mb-2 ${status === 'Normal' ? 'text-blue-900' : 'text-orange-900'}`}>
+                                {status === 'Normal' ? `정상 정산 미리보기 (${isTotalPay ? '전체 총액' : '인당'})` : `대기/취소 정산 (${waitingRate * 100}%)`}
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    {/* For Cost-Plus: baseRate (Input) is Worker Cost */}
+                                    <span className="text-gray-600">
+                                        {isTotalPay ? '기준 공급가(전체 Invoice)' : '기준 지급액(인당 Cost)'}:
+                                    </span> <span className="font-medium">
+                                        {baseRatePerPerson.toLocaleString()}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-gray-600">{isTotalPay ? '총 수수료:' : '인당 수수료:'}</span> <span className="font-medium">
+                                        +{feePerPerson.toLocaleString()}
+                                    </span>
+                                </div>
+                                <div>
+                                    {/* Show Total Billable for Clarity */}
+                                    <span className="text-gray-600">청구 공급가(Total):</span> <span className="font-bold text-lg text-blue-600">
+                                        {finalSupplyPrice.toLocaleString()}
+                                    </span>
+                                    {!isTotalPay && (
+                                        <span className="text-xs text-gray-400 block">
+                                            (인당 {standardUnitBillable.toLocaleString()}원 × {actualHeadcount || standardHeadcount}명)
+                                        </span>
                                     )}
                                 </div>
-                            ))}
-                        </div>
-                        {status !== 'Normal' && actualHeadcount === 0 && (
-                            <p className="text-xs text-orange-600 mt-1">* 대기/취소 시에도 보상 지급할 인력을 선택해주세요.</p>
-                        )}
-                    </div>
+                                <div>
+                                    <span className="text-gray-600">부가세 (10%):</span> <span className="font-medium">{finalVat.toLocaleString()}</span>
+                                </div>
+                                <div className="col-span-2 border-t border-gray-200 mt-2 pt-2">
+                                    <div className="flex justify-between font-bold text-lg">
+                                        <span>최종 청구액:</span>
+                                        <span>{finalBillTotal.toLocaleString()}원</span>
+                                    </div>
+                                </div>
 
-                    <div className="mt-6 flex justify-end">
-                        <button
-                            onClick={handleSaveLog}
-                            className={`flex items-center px-6 py-3 rounded-lg text-white font-bold 
-                                ${status !== 'Normal' || actualHeadcount >= 0 ? (isEditing ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700') : 'bg-gray-300 cursor-not-allowed'}`}
-                        >
-                            {isEditing ? <Edit2 className="w-5 h-5 mr-2" /> : <Save className="w-5 h-5 mr-2" />}
-                            {isEditing ? '수정 완료' : '작업 등록'}
-                        </button>
-                        {isEditing && editingLogId && (
+                                <div className="col-span-2 mt-2 bg-white p-2 rounded border border-gray-200">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-gray-600">인력 지급 총액:</span>
+                                        {/* Total Worker Pay is sum of individual payments */}
+                                        <span className="font-bold">
+                                            {(isManualWaiting && (status === 'Waiting' || status === 'Cancelled'))
+                                                ? (manualWorkerPay * (actualHeadcount || 1)).toLocaleString()
+                                                : Object.values(workerPayments).reduce((sum, p) => sum + p, 0).toLocaleString()}원
+                                        </span>
+                                        {/* Note: using (actualHeadcount || 1) to avoid 0 if no workers selected yet, just for preview? 
+                                                   Actually totalWorkerPayPool is the accurate total. 
+                                                   But finalPayPerWorker * actual matches the distributed amount. */}
+                                    </div>
+                                    <div className="flex justify-between items-center bg-green-50 p-2 rounded border border-green-200 mt-2">
+                                        <span className="text-sm font-bold text-green-800">예상 회사 수익 (수수료):</span>
+                                        <span className="font-bold text-green-900">
+                                            {/* In Cost-Plus: Supply - WorkerPay. 
+                                                        Warning: if manualWorkerPay is used, Fee = Supply - ManualPay.
+                                                        If standard, Fee = (Cost+Fee) - Cost = Fee. Correct. */}
+                                            {(finalSupplyPrice - ((isManualWaiting && (status === 'Waiting' || status === 'Cancelled')) ? manualWorkerPay * (actualHeadcount || 1) : Object.values(workerPayments).reduce((sum, p) => sum + p, 0))).toLocaleString()}원
+                                        </span>
+                                    </div>
+
+                                    <div className="flex justify-between items-center text-xs text-gray-500 mt-2">
+                                        <span>지급 기준 ({actualHeadcount > 0 ? actualHeadcount : standardHeadcount}명 분):</span>
+                                        <span>
+                                            {(isManualWaiting && (status === 'Waiting' || status === 'Cancelled')) ? manualWorkerPay.toLocaleString() : unitPayForWorker.toLocaleString()}원 (기본)
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                투입 인력 선택 {actualHeadcount > 0 ? `(${actualHeadcount}명)` : '(미배정 - 추후 확정 가능)'}
+                            </label>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-60 overflow-y-auto border rounded-md p-2">
+                                {initialWorkers.map(worker => (
+                                    <div
+                                        key={worker.id}
+                                        onClick={() => toggleWorker(worker.id)}
+                                        className={`p-2 rounded cursor-pointer border ${selectedWorkerIds.includes(worker.id) ? 'bg-blue-100 border-blue-500' : 'hover:bg-gray-50 border-gray-200'}`}
+                                    >
+                                        <div className="font-medium text-sm">{worker.name}</div>
+                                        <div className="text-xs text-gray-500">
+                                            {{
+                                                'Novice': '초급',
+                                                'Intermediate': '중급',
+                                                'Expert': '고급',
+                                                'Specialist': '전문'
+                                            }[worker.skill_level] || worker.skill_level}
+                                        </div>
+                                        {selectedWorkerIds.includes(worker.id) && (
+                                            <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                                                <label className="text-xs text-gray-600 block mb-1">지급액</label>
+                                                <input
+                                                    type="text"
+                                                    value={(workerPayments[worker.id] ?? finalPayPerWorker) === 0 && !workerPayments[worker.id] ? '' : (workerPayments[worker.id] ?? finalPayPerWorker).toLocaleString()}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value === '' ? 0 : (parseInt(e.target.value.replace(/,/g, '')) || 0);
+                                                        handleWorkerPaymentChange(worker.id, val);
+                                                    }}
+                                                    className="w-full text-xs p-1 border rounded"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            {status !== 'Normal' && actualHeadcount === 0 && (
+                                <p className="text-xs text-orange-600 mt-1">* 대기/취소 시에도 보상 지급할 인력을 선택해주세요.</p>
+                            )}
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
                             <button
-                                onClick={() => handleDeleteLog(editingLogId)}
-                                className="flex items-center px-6 py-3 rounded-lg text-white font-bold bg-red-600 hover:bg-red-700 ml-4"
+                                onClick={handleSaveLog}
+                                className={`flex items-center px-6 py-3 rounded-lg text-white font-bold 
+                                ${status !== 'Normal' || actualHeadcount >= 0 ? (isEditing ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700') : 'bg-gray-300 cursor-not-allowed'}`}
                             >
-                                <Trash2 className="w-5 h-5 mr-2" />
-                                삭제
+                                {isEditing ? <Edit2 className="w-5 h-5 mr-2" /> : <Save className="w-5 h-5 mr-2" />}
+                                {isEditing ? '수정 완료' : '작업 등록'}
                             </button>
-                        )}
+                            {isEditing && editingLogId && (
+                                <button
+                                    onClick={() => handleDeleteLog(editingLogId)}
+                                    className="flex items-center px-6 py-3 rounded-lg text-white font-bold bg-red-600 hover:bg-red-700 ml-4"
+                                >
+                                    <Trash2 className="w-5 h-5 mr-2" />
+                                    삭제
+                                </button>
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
-    )
+                )}
+            </div>
+            )
 }
         </div >
         </div >
