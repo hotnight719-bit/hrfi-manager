@@ -647,17 +647,28 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                         </div>
                                         <div className="grid grid-cols-2 gap-6">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">최종 청구액 (VAT 포함)</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                    청구 공급가액 (VAT 별도)
+                                                </label>
                                                 <input
                                                     type="text"
-                                                    value={manualBillable === 0 ? '' : manualBillable.toLocaleString()}
+                                                    value={manualBillable ? (isTaxFree ? manualBillable : Math.round(manualBillable / 1.1)).toLocaleString() : ''}
                                                     onChange={(e) => {
-                                                        const val = parseInt(e.target.value.replace(/,/g, '')) || 0;
-                                                        setManualBillable(val);
+                                                        const supply = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                                                        // Auto-calculate Total based on Tax Free status
+                                                        const taxRate = isTaxFree ? 1.0 : 1.1;
+                                                        setManualBillable(Math.floor(supply * taxRate));
                                                     }}
                                                     className="w-full border rounded-md p-2"
                                                     placeholder="예: 50,000"
                                                 />
+                                                {manualBillable > 0 && (
+                                                    <div className="mt-1 text-xs text-right text-gray-500">
+                                                        <span>부가세({isTaxFree ? '0%' : '10%'}): {(manualBillable - (isTaxFree ? manualBillable : Math.round(manualBillable / 1.1))).toLocaleString()}</span>
+                                                        <span className="mx-2">|</span>
+                                                        <span className="font-bold text-blue-600">합계: {manualBillable.toLocaleString()}원</span>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-1">인당 지급액</label>
