@@ -616,6 +616,7 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                                 const val = parseFloat(e.target.value);
                                                 if (val === -1) {
                                                     setIsManualWaiting(true);
+                                                    setWorkerPayments({}); // Clear overrides when switching to Manual
                                                 } else {
                                                     setIsManualWaiting(false);
                                                     setWaitingRate(val);
@@ -678,6 +679,7 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                                     onChange={(e) => {
                                                         const val = parseInt(e.target.value.replace(/,/g, '')) || 0;
                                                         setManualWorkerPay(val);
+                                                        setWorkerPayments({}); // Clear overrides when changing global manual pay
                                                     }}
                                                     className="w-full border rounded-md p-2"
                                                     placeholder="예: 30,000"
