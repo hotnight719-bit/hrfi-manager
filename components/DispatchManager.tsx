@@ -625,7 +625,7 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                                         />
                                         <label htmlFor="manualWaiting" className="ml-2 block text-sm font-bold text-gray-900">
-                                            금액 직접 입력 (Over-staffing 등 예외 상황)
+                                            금액 직접 입력 (대기/취소료, 심야/인원초과 등)
                                         </label>
                                     </div>
 

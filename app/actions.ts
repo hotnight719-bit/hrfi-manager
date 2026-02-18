@@ -182,3 +182,23 @@ export async function updateClientRatesAction(updates: { clientId: string; rateI
     revalidatePath('/settlement');
     revalidatePath('/data');
 }
+
+export async function markClientLogsAsPaidAction(clientIds: string[]) {
+    try {
+        await prisma.workLog.updateMany({
+            where: {
+                clientId: { in: clientIds },
+                isPaidFromClient: false
+            },
+            data: {
+                isPaidFromClient: true
+            }
+        });
+        revalidatePath('/dispatch');
+        revalidatePath('/settlement');
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to mark logs as paid:", error);
+        return { success: false, error: 'Failed to update logs' };
+    }
+}

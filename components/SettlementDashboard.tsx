@@ -37,6 +37,39 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
     // Popup State
     const [activeClientPopup, setActiveClientPopup] = useState<{ client: Client, x: number, y: number } | null>(null);
 
+    // Unpaid Selection State
+    const [selectedUnpaidClientIds, setSelectedUnpaidClientIds] = useState<Set<string>>(new Set());
+
+    const toggleUnpaidClientSelection = (clientId: string) => {
+        const newSet = new Set(selectedUnpaidClientIds);
+        if (newSet.has(clientId)) {
+            newSet.delete(clientId);
+        } else {
+            newSet.add(clientId);
+        }
+        setSelectedUnpaidClientIds(newSet);
+    };
+
+    const handleMarkAsPaid = async () => {
+        if (selectedUnpaidClientIds.size === 0) return;
+        if (!confirm(`선택한 ${selectedUnpaidClientIds.size}개 거래처의 미수금을 '수금 완료' 처리하시겠습니까?`)) return;
+
+        try {
+            // Import action dynamically or assume it's available via props/import
+            // Since this is a client component, we need to import the server action.
+            // But we can't import server action directly if not passed down? 
+            // flexible enough in Next.js 14. 
+            // Let's assume we import strict action.
+            const { markClientLogsAsPaidAction } = await import('@/app/actions');
+            await markClientLogsAsPaidAction(Array.from(selectedUnpaidClientIds));
+            setSelectedUnpaidClientIds(new Set());
+            alert('수금 처리가 완료되었습니다.');
+        } catch (error) {
+            console.error(error);
+            alert('처리 중 오류가 발생했습니다.');
+        }
+    };
+
     const handleClientClick = (e: React.MouseEvent, client: Client) => {
         e.stopPropagation(); // Prevent row click or other bubbles
         const rect = e.currentTarget.getBoundingClientRect();
@@ -476,10 +509,29 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
                                     총 미수금: {unpaidStats.clientUnpaid.reduce((sum, c) => sum + c.unpaidAmount, 0).toLocaleString()}원
                                 </p>
                             </div>
+
+                            {/* Batch Action Bar */}
+                            {selectedUnpaidClientIds.size > 0 && (
+                                <div className="px-6 py-2 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+                                    <span className="text-sm text-blue-800 font-medium">
+                                        {selectedUnpaidClientIds.size}개 거래처 선택됨
+                                    </span>
+                                    <button
+                                        onClick={handleMarkAsPaid}
+                                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 shadow-sm"
+                                    >
+                                        수금 처리 (완료)
+                                    </button>
+                                </div>
+                            )}
+
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
                                         <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <span className="sr-only">Select</span>
+                                            </th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">거래처명</th>
                                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">미수 건수</th>
                                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">미수금액</th>
@@ -487,7 +539,15 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
                                         {unpaidStats.clientUnpaid.map(c => (
-                                            <tr key={c.id}>
+                                            <tr key={c.id} className={selectedUnpaidClientIds.has(c.id) ? 'bg-blue-50' : ''}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 w-10">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedUnpaidClientIds.has(c.id)}
+                                                        onChange={() => toggleUnpaidClientSelection(c.id)}
+                                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                    />
+                                                </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                     <span
                                                         className="cursor-pointer border-b border-dotted border-gray-400 hover:text-blue-600 text-blue-600 font-bold"
@@ -516,6 +576,10 @@ export default function SettlementDashboard({ initialClients, initialWorkers, in
                                     총 미지급액: {unpaidStats.workerUnpaid.reduce((sum, w) => sum + w.unpaidAmount, 0).toLocaleString()}원
                                 </p>
                             </div>
+
+                            {/* Batch Action Bar */}
+
+
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
