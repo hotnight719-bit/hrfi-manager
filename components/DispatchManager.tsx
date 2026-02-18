@@ -172,13 +172,19 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
     let finalBillTotal = finalSupplyPrice + finalVat;
 
     // Manual Override Logic
-    if (isManualWaiting) { // Checkbox 'manualWaiting' is now effectively 'manualOverride'
+    if (isManualWaiting && (status === 'Waiting' || status === 'Cancelled')) {
         finalBillTotal = manualBillable;
-    }
-
-    // Worker Pay Override
-    if (isManualWaiting) {
         finalPayPerWorker = manualWorkerPay;
+
+        // Recalculate Supply Price from Manual Billable (Back-calculate from VAT)
+        // Profit = Supply - Pay. We need Supply.
+        if (isTaxFree) {
+            finalSupplyPrice = finalBillTotal;
+        } else {
+            // Bill = Supply + VAT(10%) = Supply * 1.1
+            // Supply = Bill / 1.1
+            finalSupplyPrice = Math.round(finalBillTotal / 1.1);
+        }
     }
 
 
@@ -674,7 +680,7 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                         </div>
                                         <div>
                                             <span className="text-gray-600">{isTotalPay ? '총 수수료:' : '인당 수수료:'}</span> <span className="font-medium">
-                                                -{feePerPerson.toLocaleString()}
+                                                +{feePerPerson.toLocaleString()}
                                             </span>
                                         </div>
                                         <div>
@@ -703,7 +709,7 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                                 <span className="text-gray-600">인력 지급 총액:</span>
                                                 {/* Total Worker Pay is sum of individual payments */}
                                                 <span className="font-bold">
-                                                    {isManualWaiting
+                                                    {(isManualWaiting && (status === 'Waiting' || status === 'Cancelled'))
                                                         ? (manualWorkerPay * (actualHeadcount || 1)).toLocaleString()
                                                         : Object.values(workerPayments).reduce((sum, p) => sum + p, 0).toLocaleString()}원
                                                 </span>
@@ -717,14 +723,14 @@ export default function DispatchManager({ initialClients, initialWorkers, initia
                                                     {/* In Cost-Plus: Supply - WorkerPay. 
                                                         Warning: if manualWorkerPay is used, Fee = Supply - ManualPay.
                                                         If standard, Fee = (Cost+Fee) - Cost = Fee. Correct. */}
-                                                    {(finalSupplyPrice - (isManualWaiting ? manualWorkerPay * (actualHeadcount || 1) : Object.values(workerPayments).reduce((sum, p) => sum + p, 0))).toLocaleString()}원
+                                                    {(finalSupplyPrice - ((isManualWaiting && (status === 'Waiting' || status === 'Cancelled')) ? manualWorkerPay * (actualHeadcount || 1) : Object.values(workerPayments).reduce((sum, p) => sum + p, 0))).toLocaleString()}원
                                                 </span>
                                             </div>
 
                                             <div className="flex justify-between items-center text-xs text-gray-500 mt-2">
                                                 <span>지급 기준 ({actualHeadcount > 0 ? actualHeadcount : standardHeadcount}명 분):</span>
                                                 <span>
-                                                    {isManualWaiting ? manualWorkerPay.toLocaleString() : unitPayForWorker.toLocaleString()}원 (기본)
+                                                    {(isManualWaiting && (status === 'Waiting' || status === 'Cancelled')) ? manualWorkerPay.toLocaleString() : unitPayForWorker.toLocaleString()}원 (기본)
                                                 </span>
                                             </div>
                                         </div>
